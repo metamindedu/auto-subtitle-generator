@@ -57,7 +57,8 @@
    - Microsoft Visual C++ 빌드 도구가 없는 경우 자동으로 설치하거나 이 기능을 건너뛸 수 있습니다.
    - FFmpeg도 선택적으로 자동 설치할 수 있습니다.
    - 필요한 라이브러리가 자동으로 설치됩니다.
-4. 모든 설치가 완료되면 자동으로 실행되며, 이후 다시 실행할 때는 `install_run_windows.ps1` 파일을 "PowerShell에서 실행"합니다.
+4. 모든 설치가 완료되면 자동으로 실행됩니다.
+5. **이후 다시 실행할 때는 `자막생성기.bat` 파일을 더블클릭**하면 됩니다.
 
 ### macOS/Linux
 
@@ -74,7 +75,9 @@
 
 ### 실행
 
-- **Windows**: `install_run_windows.ps1` 파일을 우클릭한 후, "PowerShell에서 실행"을 눌러 실행합니다.
+- **Windows**: `자막생성기.bat` 파일을 더블클릭하여 실행합니다.
+  - 또는 `install_run_windows.ps1` 파일을 우클릭한 후, "PowerShell에서 실행"을 눌러 실행합니다.
+  - 바탕화면에서 바로 실행하려면: `자막생성기.bat` 파일을 우클릭 → "바로 가기 만들기" → 바로가기를 바탕화면으로 이동
 - **macOS/Linux**: 터미널에서 `./2. run_mac_linux.sh` 명령을 실행합니다.
 
 실행 후 웹 브라우저가 자동으로 열리며 Streamlit 인터페이스가 표시됩니다. 브라우저가 자동으로 열리지 않는 경우 `http://localhost:8501`로 접속하세요.
@@ -98,7 +101,9 @@
 #### LLM 교정 제공자
 - **사용안함**: LLM 교정 없이 Whisper 결과 그대로 사용
 - **OpenAI**: OpenAI API를 사용하여 자막 교정 (API 키 필요)
+  - 사용 모델: `gpt-5-mini`
 - **Anthropic**: Anthropic Claude API를 사용하여 자막 교정 (API 키 필요)
+  - 사용 모델: `claude-haiku-4-5`
 
 #### API 키 설정
 OpenAI 또는 Anthropic을 선택한 경우, "API 키 설정" 확장 메뉴에서 API 키를 입력해야 합니다. 또는 프로젝트 루트 폴더에 `.env` 파일을 생성하고 다음과 같이 API 키를 설정할 수 있습니다:

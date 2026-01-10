@@ -10,6 +10,7 @@ import collections
 import contextlib
 import wave
 import subprocess
+import json
 from tqdm import tqdm
 from datetime import timedelta
 import time
@@ -17,6 +18,44 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 import anthropic
+
+# API 키 저장 파일 경로
+API_KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".api_keys.json")
+
+def load_saved_api_keys():
+    """저장된 API 키를 파일에서 로드"""
+    try:
+        if os.path.exists(API_KEYS_FILE):
+            with open(API_KEYS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        st.warning(f"API 키 로드 중 오류: {str(e)}")
+    return {}
+
+def save_api_keys(openai_key=None, anthropic_key=None):
+    """API 키를 파일에 저장"""
+    try:
+        keys = load_saved_api_keys()
+        if openai_key is not None:
+            keys['openai_api_key'] = openai_key
+        if anthropic_key is not None:
+            keys['anthropic_api_key'] = anthropic_key
+        with open(API_KEYS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(keys, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"API 키 저장 중 오류: {str(e)}")
+        return False
+
+def delete_saved_api_keys():
+    """저장된 API 키 파일 삭제"""
+    try:
+        if os.path.exists(API_KEYS_FILE):
+            os.remove(API_KEYS_FILE)
+        return True
+    except Exception as e:
+        st.error(f"API 키 삭제 중 오류: {str(e)}")
+        return False
 
 # .env 파일 로드
 load_dotenv()
@@ -365,22 +404,20 @@ class SubtitleGenerator:
             
             if self.llm_provider == "openai":
                 response = self.llm_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-5-mini",
                     messages=[
                         {"role": "system", "content": self.prompt_manager.system_prompt},
                         {"role": "user", "content": self.prompt_manager.get_user_prompt(
                             context, subtitle_text, previous_subs, next_subs
                         )}
                     ],
-                    temperature=0.3
                 )
                 corrected_text = response.choices[0].message.content.strip()
                 
             elif self.llm_provider == "anthropic":
                 response = self.llm_client.messages.create(
-                    model="claude-3-5-haiku-20241022",
+                    model="claude-haiku-4-5",
                     max_tokens=1000,
-                    temperature=0.3,
                     system=self.prompt_manager.system_prompt,
                     messages=[{
                         "role": "user", 
@@ -956,10 +993,21 @@ def main():
     # 세션 상태 초기화
     if 'vad_module_loaded' not in st.session_state:
         st.session_state.vad_module_loaded = False
+
+    # 저장된 API 키 로드
+    if 'api_keys_loaded' not in st.session_state:
+        saved_keys = load_saved_api_keys()
+        st.session_state.openai_api_key = saved_keys.get('openai_api_key', '')
+        st.session_state.anthropic_api_key = saved_keys.get('anthropic_api_key', '')
+        st.session_state.save_api_keys_enabled = bool(saved_keys)  # 저장된 키가 있으면 체크박스 활성화
+        st.session_state.api_keys_loaded = True
+
     if 'openai_api_key' not in st.session_state:
         st.session_state.openai_api_key = ""
     if 'anthropic_api_key' not in st.session_state:
         st.session_state.anthropic_api_key = ""
+    if 'save_api_keys_enabled' not in st.session_state:
+        st.session_state.save_api_keys_enabled = False
     if 'last_srt_content' not in st.session_state:
         st.session_state.last_srt_content = None
     if 'last_filename' not in st.session_state:
@@ -1008,25 +1056,47 @@ def main():
         # API 키 설정
         with st.expander("API 키 설정", expanded=False):
             openai_key = st.text_input(
-                "OpenAI API 키", 
-                type="password", 
+                "OpenAI API 키",
+                type="password",
                 value=st.session_state.openai_api_key,
                 key="openai_api_key_input"
             )
             anthropic_key = st.text_input(
-                "Anthropic API 키", 
-                type="password", 
+                "Anthropic API 키",
+                type="password",
                 value=st.session_state.anthropic_api_key,
                 key="anthropic_api_key_input"
             )
-            
+
+            # API 키 저장 체크박스
+            save_keys = st.checkbox(
+                "API 키 저장 (다음 실행 시에도 유지)",
+                value=st.session_state.save_api_keys_enabled,
+                help="체크하면 API 키가 로컬 파일에 저장됩니다. 저장된 키는 .gitignore에 의해 GitHub에 업로드되지 않습니다."
+            )
+
             if openai_key:
                 os.environ["OPENAI_API_KEY"] = openai_key
                 st.session_state.openai_api_key = openai_key
-            
+
             if anthropic_key:
                 os.environ["ANTHROPIC_API_KEY"] = anthropic_key
                 st.session_state.anthropic_api_key = anthropic_key
+
+            # 저장 상태 변경 처리
+            if save_keys != st.session_state.save_api_keys_enabled:
+                st.session_state.save_api_keys_enabled = save_keys
+                if save_keys:
+                    # 체크박스 활성화: API 키 저장
+                    if save_api_keys(openai_key, anthropic_key):
+                        st.success("API 키가 저장되었습니다.")
+                else:
+                    # 체크박스 비활성화: 저장된 API 키 삭제
+                    if delete_saved_api_keys():
+                        st.info("저장된 API 키가 삭제되었습니다.")
+            elif save_keys and (openai_key or anthropic_key):
+                # 체크박스가 활성화된 상태에서 키가 변경되면 자동 저장
+                save_api_keys(openai_key if openai_key else None, anthropic_key if anthropic_key else None)
         
         # 모델 설정
         whisper_model = st.selectbox(
